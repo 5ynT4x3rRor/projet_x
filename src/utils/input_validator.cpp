@@ -216,3 +216,26 @@ bool safe_getline(std::string& input, size_t max_length)
     return true;
 }
 
+/**
+ * @brief Validates the main command prompt input against an active whitelist
+ */
+bool validate_command_whitelist(const std::string& command)
+{
+    // Liste blanche stricte des commandes actives et autorisées
+    const std::string active_commands[] = {
+        "help",
+        "exit",
+        "scan",
+        "set target",
+        "set port",
+        "proxy"
+    };
+
+    for (const auto& cmd : active_commands) {
+        if (command == cmd || command.rfind(cmd + " ", 0) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}

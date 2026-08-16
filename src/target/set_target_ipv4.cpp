@@ -241,7 +241,3 @@ ipv4_target_t* get_target_ipv4(void)
     }
     return nullptr;
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> 4081bc7 (feat(target): add new validation and port modules)

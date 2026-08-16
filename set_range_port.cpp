@@ -89,6 +89,9 @@ static port_range_status_t parse_range_ports(const std::string& range_str, port_
      return PORT_RANGE_OK;
 }
 
+/**
+ * @brief Affiche le message d'erreur approprié
+ */
 void handle_range_port_error(port_range_status_t status)
 {
     switch (status) {
@@ -116,6 +119,9 @@ void handle_range_port_error(port_range_status_t status)
     }
 }
 
+/**
+ * @brief Gère la commande de définition de la plage de ports
+ */
 void handle_range_port_command(const std::string& command)
 {
     port_range_t new_range;

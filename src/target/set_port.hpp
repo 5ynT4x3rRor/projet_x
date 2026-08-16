@@ -1,9 +1,9 @@
-#ifndef PORT_HPP
-#define PORT_HPP
+#ifndef SET_PORT_HPP
+#define SET_PORT_HPP
 
 #include <string>
 
-extern int target_port;
-void handle_port_command(const std::string& command);
+// Déclaration de la fonction de gestion du port
+bool handle_set_port(const std::string& port_arg);
 
-#endif
+#endif // SET_PORT_HPP

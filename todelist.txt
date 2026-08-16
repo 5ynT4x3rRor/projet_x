@@ -1,0 +1,5 @@
+- [ ] **Input Validation (Core)**: Sanitize and secure all user inputs to fix the 3 identified vulnerabilities.
+
+- [ ] **Core Integration**: Validate and integrate all new modules into `main.cpp` to make them fully operational and accessible.
+
+
