@@ -27,4 +27,3 @@ void display_target_ipv4(const ipv4_target_t *target);
 ipv4_target_t* get_target_ipv4(void);
 
 #endif
-

@@ -1,16 +1,13 @@
-#include <iostream>
 #include "set_port.hpp"
-#include "utils/input_validator.hpp"
+#include "../utils/input_validator_port.hpp"
+#include <iostream>
 
-bool handle_set_port(const std::string& port_arg) {
-    int port = 0;
-    input_status_t status = validate_port_string(port_arg, port);
-
-    if (status != INPUT_VALID) {
-        std::cout << "[-] Erreur port : " << get_validation_error_message(status) << "\n";
-        return false;
+void handle_set_port(const std::string& port_arg) {
+    if (!validate_port(port_arg)) {
+        std::cout << "[-] Erreur : Port invalide (doit être un nombre entre 1 et 65535).\n";
+        return;
     }
 
-    std::cout << "[+] Port configuré avec succès : " << port << "\n";
-    return true;
+    std::cout << "[+] Port verrouillé avec succès : " << port_arg << "\n";
+    // Suite de ta logique...
 }

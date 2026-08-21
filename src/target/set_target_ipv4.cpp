@@ -6,13 +6,13 @@
 #include <cstdint>
 #include "set_target_ipv4.hpp"
 
-/* Global variable to store the current target IPv4 */
-static ipv4_target_t current_target = {
-    .octets = {0, 0, 0, 0},
-    .ip_str = {0}
+/* Variables globales partagées (sans static pour être accessibles par les autres modules) */
+ipv4_target_t current_target = {
+    {0, 0, 0, 0},
+    {0}
 };
 
-static bool target_defined = false;
+bool target_defined = false;
 
 /**
  * @brief Validates that a string is a valid decimal number (0-255)
@@ -32,7 +32,7 @@ static int validate_octet(const char *str, size_t len)
     char temp[4] = {0};
     std::strncpy(temp, str, len);
     temp[len] = '\0';
-    
+
     int value = std::atoi(temp);
 
     if (value < 0 || value > 255) {
@@ -56,188 +56,120 @@ static ipv4_target_status_t parse_ipv4(const char *input, uint8_t *octets)
         return IPV4_TARGET_ERR_BUFFER_OVERFLOW;
     }
 
-    int parsed_octets[4] = {-1, -1, -1, -1};
-    int octet_index = 0;
-    size_t current_octet_len = 0;
-    const char *current_octet_start = input;
+    int octet_count = 0;
+    const char *start = input;
+    const char *ptr = input;
 
-    for (size_t i = 0; i <= input_len; i++) {
-        char c = input[i];
-
-        if (c == '.' || c == '\0') {
-            if (current_octet_len == 0) {
-                return IPV4_TARGET_ERR_INVALID_FORMAT;
-            }
-
-            int octet_value = validate_octet(current_octet_start, current_octet_len);
-            if (octet_value < 0) {
+    while (*ptr != '\0') {
+        if (*ptr == '.') {
+            size_t len = ptr - start;
+            int val = validate_octet(start, len);
+            if (val < 0) {
                 return IPV4_TARGET_ERR_INVALID_OCTET;
             }
-
-            parsed_octets[octet_index] = octet_value;
-            octet_index++;
-
-            if (c == '\0') {
-                if (octet_index != 4) {
-                    return IPV4_TARGET_ERR_INVALID_FORMAT;
-                }
-                break;
-            }
-
-            if (octet_index > 4) {
+            if (octet_count >= 4) {
                 return IPV4_TARGET_ERR_INVALID_FORMAT;
             }
-
-            current_octet_start = &input[i + 1];
-            current_octet_len = 0;
-        } else if (std::isdigit((unsigned char)c)) {
-            current_octet_len++;
-        } else {
-            return IPV4_TARGET_ERR_INVALID_FORMAT;
+            octets[octet_count++] = (uint8_t)val;
+            start = ptr + 1;
         }
+        ptr++;
     }
 
-    if (octet_index != 4) {
+    // Dernier octet
+    size_t len = ptr - start;
+    int val = validate_octet(start, len);
+    if (val < 0) {
+        return IPV4_TARGET_ERR_INVALID_OCTET;
+    }
+    if (octet_count != 3) {
         return IPV4_TARGET_ERR_INVALID_FORMAT;
     }
-
-    for (int i = 0; i < 4; i++) {
-        octets[i] = (uint8_t)parsed_octets[i];
-    }
+    octets[octet_count] = (uint8_t)val;
 
     return IPV4_TARGET_OK;
 }
 
-/**
- * @brief Converts an octet array to an IPv4 string
- */
-static ipv4_target_status_t octets_to_string(const uint8_t *octets, char *str, size_t str_len)
-{
-    if (!octets || !str || str_len < 16) {
-        return IPV4_TARGET_ERR_BUFFER_OVERFLOW;
-    }
-
-    int result = std::snprintf(str, str_len, "%u.%u.%u.%u",
-                               octets[0], octets[1], octets[2], octets[3]);
-
-    if (result < 0 || result >= (int)str_len) {
-        return IPV4_TARGET_ERR_BUFFER_OVERFLOW;
-    }
-
-    return IPV4_TARGET_OK;
-}
-
-/**
- * @brief Parses and validates a single IPv4 target address
- */
-static ipv4_target_status_t parse_target(const std::string& target_str, ipv4_target_t *target)
-{
-    if (!target) {
-        return IPV4_TARGET_ERR_NULL_INPUT;
-    }
-
-    if (target_str.empty()) {
-        return IPV4_TARGET_ERR_EMPTY_INPUT;
-    }
-
-    /* Parse the IPv4 address */
-    ipv4_target_status_t status = parse_ipv4(target_str.c_str(), target->octets);
-    if (status != IPV4_TARGET_OK) {
-        return status;
-    }
-
-    /* Convert octets to string */
-    status = octets_to_string(target->octets, target->ip_str, sizeof(target->ip_str));
-    if (status != IPV4_TARGET_OK) {
-        return status;
-    }
-
-    return IPV4_TARGET_OK;
-}
-
-/**
- * @brief Handles the IPv4 target command
- */
+// Fonction pour gérer la commande set target
 void handle_target_ipv4_command(const std::string& command)
 {
-    if (command.rfind("set target ipv4 : ", 0) == 0) {
-        std::string target_str = command.substr(18);
+    std::string prefix = "set target_ipv4"; // Modification du prefix suite la modification de la sécuritée des entrées (set target ---> set_target_ipv4) 
+    std::string ip_str;
 
-        ipv4_target_t temp_target = {0};
-        ipv4_target_status_t status = parse_target(target_str, &temp_target);
-
-        if (status == IPV4_TARGET_OK) {
-            current_target = temp_target;
-            target_defined = true;
-            std::cout << "\033[1;32m[+] Cible IPv4 définie !\033[0m\n";
-            display_target_ipv4(&current_target);
-        } else {
-            handle_target_ipv4_error(status);
-        }
-    } else if (command == "show target ipv4") {
-        if (!target_defined) {
-            std::cout << "\033[1;33m[-] Aucune cible IPv4 définie.\033[0m\n";
-        } else {
-            display_target_ipv4(&current_target);
-        }
-    }
-}
-
-/**
- * @brief Displays the appropriate error message
- */
-void handle_target_ipv4_error(ipv4_target_status_t status)
-{
-    std::cout << "\n\033[1;31m❌ ERREUR : ";
-
-    switch (status) {
-        case IPV4_TARGET_OK:
-            std::cout << "Aucune erreur.\033[0m\n";
-            break;
-        case IPV4_TARGET_ERR_NULL_INPUT:
-            std::cout << "Pointeur NULL fourni.\033[0m\n";
-            break;
-        case IPV4_TARGET_ERR_EMPTY_INPUT:
-            std::cout << "La cible IPv4 ne peut pas être vide.\033[0m\n";
-            break;
-        case IPV4_TARGET_ERR_INVALID_FORMAT:
-            std::cout << "Format invalide.\033[0m\n";
-            std::cout << "\033[1;36m📝 Format accepté :\033[0m\n";
-            std::cout << "   - set target ipv4 : 192.168.1.1\n";
-            break;
-        case IPV4_TARGET_ERR_INVALID_OCTET:
-            std::cout << "Un ou plusieurs octets sont invalides (doit être 0-255).\033[0m\n";
-            break;
-        case IPV4_TARGET_ERR_BUFFER_OVERFLOW:
-            std::cout << "Adresse IPv4 trop longue.\033[0m\n";
-            break;
-        default:
-            std::cout << "Erreur inconnue (code: " << status << ").\033[0m\n";
+    if (command.rfind(prefix, 0) == 0) {
+        ip_str = command.substr(prefix.length());
+    } else {
+        ip_str = command;
     }
 
-    std::cout << "\033[1;36m📝 Réessayez avec une adresse IPv4 valide.\033[0m\n\n";
-}
+    // Nettoyage des espaces superflus
+    ip_str.erase(0, ip_str.find_first_not_of(" \t\n\r"));
+    ip_str.erase(ip_str.find_last_not_of(" \t\n\r") + 1);
 
-/**
- * @brief Displays the validated IPv4 target
- */
-void display_target_ipv4(const ipv4_target_t *target)
-{
-    if (!target) {
-        std::cout << "Erreur : pointeur NULL\n";
+    if (ip_str.empty()) {
+        handle_target_ipv4_error(IPV4_TARGET_ERR_EMPTY_INPUT);
         return;
     }
 
-    std::cout << "\033[1;36m[*] Cible IPv4 : " << target->ip_str << "\033[0m\n";
+    uint8_t temp_octets[4];
+    ipv4_target_status_t status = parse_ipv4(ip_str.c_str(), temp_octets);
+
+    if (status != IPV4_TARGET_OK) {
+        handle_target_ipv4_error(status);
+        return;
+    }
+
+    // Mise à jour de la cible globale
+    for (int i = 0; i < 4; i++) {
+        current_target.octets[i] = temp_octets[i];
+    }
+    
+    std::strncpy(current_target.ip_str, ip_str.c_str(), sizeof(current_target.ip_str) - 1);
+    current_target.ip_str[sizeof(current_target.ip_str) - 1] = '\0';
+
+    target_defined = true;
+
+    std::cout << "[+] Cible IPv4 verrouillée : " << current_target.ip_str << "\n";
+}
+
+void handle_target_ipv4_error(ipv4_target_status_t status)
+{
+    switch (status) {
+        case IPV4_TARGET_ERR_NULL_INPUT:
+        case IPV4_TARGET_ERR_EMPTY_INPUT:
+            std::cout << "[-] Erreur : Entrée vide ou nulle.\n";
+            break;
+        case IPV4_TARGET_ERR_INVALID_FORMAT:
+            std::cout << "[-] Erreur : Format IPv4 invalide (ex attendu : X.X.X.X).\n";
+            break;
+        case IPV4_TARGET_ERR_INVALID_OCTET:
+            std::cout << "[-] Erreur : Octet invalide (doit être entre 0 et 255).\n";
+            break;
+        case IPV4_TARGET_ERR_BUFFER_OVERFLOW:
+            std::cout << "[-] Erreur : Dépassement de tampon (chaîne trop longue).\n";
+            break;
+        default:
+            std::cout << "[-] Erreur IPv4 inconnue.\n";
+            break;
+    }
+}
+
+void display_target_ipv4(const ipv4_target_t *target)
+{
+    if (target && target_defined) {
+        std::cout << "[+] Cible IPv4 actuelle : " << target->ip_str << "\n";
+    } else {
+        std::cout << "[-] Aucune cible IPv4 définie.\n";
+    }
 }
 
 /**
- * @brief Gets the current IPv4 target
+ * @brief Getter public pour récupérer la cible IPv4 depuis d'autres modules (ex: scan)
  */
 ipv4_target_t* get_target_ipv4(void)
 {
-    if (target_defined) {
-        return &current_target;
+    if (!target_defined) {
+        return nullptr;
     }
-    return nullptr;
+    return &current_target;
 }
